@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Finance Dashboard Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f0f0f;
+      color: white;
+      padding: 20px;
+    }
+
+    h2 { color: #4dd0e1; }
+
+    .grid {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .box {
+      background: #1c1c1c;
+      padding: 15px;
+      border-radius: 10px;
+      flex: 1;
+      min-width: 300px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 6px;
+      border: none;
+    }
+
+    button {
+      background: #4dd0e1;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    canvas {
+      background: #222;
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+
+    /* TABLE STYLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #333;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      color: #4dd0e1;
+      font-weight: bold;
+    }
+
+    .delete-btn {
+      background: #ff5252;
+      color: white;
+      padding: 3px 6px;
+      font-size: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .summary {
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>📊 Finance Dashboard Pro</h2>
+
+<div class="grid">
+
+  <!-- INPUT -->
+  <div class="box">
+    <h3>➕ Add Expense</h3>
+
+    <input type="number" id="amount" placeholder="Amount ₹">
+
+    <select id="category"></select>
+
+    <button onclick="addExpense()">Add Expense</button>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="box">
+    <h3>⚙ Settings</h3>
+
+    <label>📅 Select Month (2026)</label>
+    <select id="monthSelect" onchange="switchMonth()"></select>
+
+    <label>💰 Monthly Budget (₹)</label>
+    <input type="number" id="budgetInput" placeholder="Set monthly budget">
+    <button onclick="setBudget()">Save Budget</button>
+
+    <p id="budgetStatus"></p>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="box">
+    <h3>💰 Summary</h3>
+
+    <p>Total Expenses: <b id="total"></b></p>
+    <p>Budget Left: <b id="remaining"></b></p>
+    <p>🔥 Discipline Streak: <b id="streak"></b></p>
+  </div>
+
+  <!-- PIE -->
+  <div class="box">
+    <h3>📊 Category %</h3>
+    <canvas id="chart" width="300" height="300"></canvas>
+  </div>
+
+  <!-- KAKEBO -->
+  <div class="box">
+    <h3>🧘 Kakebo Breakdown</h3>
+    <p style="font-size:12px; color:#999;">Auto-mapped from your categories — Japanese budgeting method (Survival / Optional / Culture / Extra)</p>
+    <div id="kakeboBreakdown"></div>
+  </div>
+
+</div>
+
+<!-- KAKEBO REFLECTION -->
+<div class="box">
+  <h3>📝 Monthly Reflection (Kakebo)</h3>
+  <p style="font-size:12px; color:#999;">Answer these at month-end. Saved automatically per month.</p>
+
+  <label>How much did you want to save this month? (₹)</label>
+  <input type="number" id="reflectGoal" placeholder="Target savings">
+
+  <label>How much did you actually save? (₹)</label>
+  <input type="number" id="reflectActual" placeholder="Actual savings">
+
+  <label>What would you change next month?</label>
+  <input type="text" id="reflectChange" placeholder="e.g. cut down on Shopping">
+
+  <button onclick="saveReflection()">Save Reflection</button>
+  <p id="reflectStatus" style="font-size:12px; color:#4dd0e1;"></p>
+</div>
+
+<!-- LOGS (TABLE) -->
+<div class="box">
+  <h3>📜 Expense Logs</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Category</th>
+        <th>Amount</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+
+    <tbody id="list"></tbody>
+  </table>
+</div>
+
+<script>
+
+const YEAR = 2026;
+const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+let activeMonth = `${YEAR}-Jan`;
+let data = JSON.parse(localStorage.getItem(activeMonth)) || [];
+
+let budget = localStorage.getItem(`budget-${activeMonth}`) || 10000;
+
+/* CATEGORY */
+const categories = [
+  "Grocery for Kitchen",
+  "Rent",
+  "Travel",
+  "Shopping",
+  "Food",
+  "Grooming (Beard/Cutting)",
+  "Entertainment",
+  "Health",
+  "Petrol"
+];
+
+let cat = document.getElementById("category");
+categories.forEach(c=>{
+  let o = document.createElement("option");
+  o.textContent = c;
+  cat.appendChild(o);
+});
+
+/* MONTHS */
+function loadMonths() {
+  let select = document.getElementById("monthSelect");
+  select.innerHTML = "";
+
+  months.forEach(m=>{
+    let key = `${YEAR}-${m}`;
+    let o = document.createElement("option");
+    o.value = key;
+    o.textContent = `${m} ${YEAR}`;
+    select.appendChild(o);
+  });
+
+  select.value = activeMonth;
+}
+
+loadMonths();
+
+/* SWITCH MONTH */
+function switchMonth() {
+  activeMonth = document.getElementById("monthSelect").value;
+  data = JSON.parse(localStorage.getItem(activeMonth)) || [];
+  budget = localStorage.getItem(`budget-${activeMonth}`) || 10000;
+  render();
+}
+
+/* SAVE */
+function save() {
+  localStorage.setItem(activeMonth, JSON.stringify(data));
+}
+
+/* ADD */
+function addExpense() {
+  let amount = parseFloat(document.getElementById("amount").value);
+  let category = document.getElementById("category").value;
+
+  if (!amount || amount <= 0) return;
+
+  data.push({
+    id: Date.now(),
+    amount,
+    category,
+    date: new Date().toDateString()
+  });
+
+  save();
+  render();
+}
+
+/* DELETE */
+function deleteExpense(id) {
+  data = data.filter(e => e.id !== id);
+  save();
+  render();
+}
+
+/* TOTAL */
+function getTotal() {
+  return data.reduce((s,e)=>s+e.amount,0);
+}
+
+/* BUDGET */
+function setBudget() {
+  budget = document.getElementById("budgetInput").value;
+  localStorage.setItem(`budget-${activeMonth}`, budget);
+  render();
+}
+
+/* CHART COLORS */
+const pieColors = [
+  "#4dd0e1","#ff7043","#66bb6a","#ab47bc",
+  "#ffa726","#ef5350","#26c6da","#d4e157"
+];
+
+/* CHART */
+function drawChart() {
+  let canvas = document.getElementById("chart");
+  let ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  let totals = {};
+  data.forEach(e => {
+    totals[e.category] = (totals[e.category] || 0) + e.amount;
+  });
+
+  let labels = Object.keys(totals);
+  let sum = getTotal();
+
+  ctx.fillStyle = "white";
+  ctx.font = "13px Arial";
+
+  if (sum === 0) {
+    ctx.fillText("No expenses yet — add one above", 10, 30);
+    return;
+  }
+
+  const LEGEND_ROW   = 24;   /* px per legend row — enough breathing room */
+  const LEGEND_GAP   = 16;   /* gap between pie bottom and first legend row */
+  const SQUARE       = 13;   /* colored square size */
+  const FONT_SIZE    = 12;
+  const PIE_DIAMETER = 220;
+  const cx = PIE_DIAMETER / 2 + 10;
+  const cy = PIE_DIAMETER / 2 + 10;
+  const radius = PIE_DIAMETER / 2;
+
+  /* set canvas width wide enough for longest possible label */
+  /* "Grocery for Kitchen: 100.0% (₹99999)" ~ 280px at 12px Arial */
+  canvas.width  = Math.max(canvas.parentElement.clientWidth - 30, 340);
+  canvas.height = cy + radius + LEGEND_GAP + (labels.length * LEGEND_ROW) + 20;
+
+  /* PIE SLICES */
+  ctx.font = `${FONT_SIZE}px Arial`;
+  let startAngle = -Math.PI / 2;
+  labels.forEach((l, i) => {
+    let slice = (totals[l] / sum) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle, startAngle + slice);
+    ctx.closePath();
+    ctx.fillStyle = pieColors[i % pieColors.length];
+    ctx.fill();
+    ctx.strokeStyle = "#0f0f0f";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    startAngle += slice;
+  });
+
+  /* LEGEND — each row: [■] Category name ............ XX.X% ₹XXXX */
+  let legendY = cy + radius + LEGEND_GAP + SQUARE;
+  labels.forEach((l, i) => {
+    let pct    = ((totals[l] / sum) * 100).toFixed(1);
+    let amtStr = `${pct}%  ₹${totals[l].toLocaleString('en-IN')}`;
+
+    /* colored square */
+    ctx.fillStyle = pieColors[i % pieColors.length];
+    ctx.fillRect(10, legendY - SQUARE + 2, SQUARE, SQUARE);
+
+    /* category name (left) */
+    ctx.fillStyle = "#cccccc";
+    ctx.font = `${FONT_SIZE}px Arial`;
+    ctx.textAlign = "left";
+    ctx.fillText(l, 30, legendY);
+
+    /* amount + pct (right-aligned) */
+    ctx.fillStyle = "white";
+    ctx.font = `bold ${FONT_SIZE}px Arial`;
+    ctx.textAlign = "right";
+    ctx.fillText(amtStr, canvas.width - 10, legendY);
+
+    /* dotted separator line between name and amount */
+    ctx.fillStyle = "#444";
+    ctx.font = `${FONT_SIZE}px Arial`;
+    ctx.textAlign = "left";
+    let nameWidth  = ctx.measureText(l).width + 34;
+    let amtWidth   = ctx.measureText(amtStr).width + 14;
+    let dotsWidth  = canvas.width - nameWidth - amtWidth;
+    if (dotsWidth > 0) {
+      ctx.fillText(".".repeat(Math.floor(dotsWidth / 5)), nameWidth, legendY);
+    }
+
+    legendY += LEGEND_ROW;
+  });
+  ctx.textAlign = "left"; /* reset */
+}
+
+/* KAKEBO MAPPING ‑ auto-maps existing categories into the 4 Kakebo groups */
+/* Survival = needs, Optional = wants, Culture = growth/learning/social, Extra = unexpected/variable */
+const kakeboMap = {
+  "Grocery for Kitchen": "Survival",
+  "Rent": "Survival",
+  "Health": "Survival",
+  "Petrol": "Survival",
+  "Food": "Optional",
+  "Shopping": "Optional",
+  "Grooming (Beard/Cutting)": "Optional",
+  "Entertainment": "Culture",
+  "Travel": "Extra"
+};
+
+function getKakeboTotals() {
+  let groups = { Survival: 0, Optional: 0, Culture: 0, Extra: 0 };
+
+  data.forEach(e => {
+    let group = kakeboMap[e.category] || "Extra";
+    groups[group] += e.amount;
+  });
+
+  return groups;
+}
+
+function renderKakebo() {
+  let groups = getKakeboTotals();
+  let sum = getTotal();
+  let box = document.getElementById("kakeboBreakdown");
+
+  let order = ["Survival","Optional","Culture","Extra"];
+  let html = "";
+
+  order.forEach(g=>{
+    let amt = groups[g];
+    let pct = sum > 0 ? ((amt/sum)*100).toFixed(1) : "0.0";
+    html += `<p>${g}: ₹${amt} (${pct}%)</p>`;
+  });
+
+  box.innerHTML = html;
+}
+
+/* KAKEBO REFLECTION - saved per month, separate key so existing expense data is untouched */
+function saveReflection() {
+  let reflection = {
+    goal: document.getElementById("reflectGoal").value,
+    actual: document.getElementById("reflectActual").value,
+    change: document.getElementById("reflectChange").value
+  };
+
+  localStorage.setItem(`reflection-${activeMonth}`, JSON.stringify(reflection));
+  document.getElementById("reflectStatus").innerText = "✔ Reflection saved for " + activeMonth;
+}
+
+function loadReflection() {
+  let saved = JSON.parse(localStorage.getItem(`reflection-${activeMonth}`)) || {};
+
+  document.getElementById("reflectGoal").value = saved.goal || "";
+  document.getElementById("reflectActual").value = saved.actual || "";
+  document.getElementById("reflectChange").value = saved.change || "";
+  document.getElementById("reflectStatus").innerText = "";
+}
+
+/* DISCIPLINE STREAK - counts consecutive months (up to current) that stayed within budget */
+function getStreak() {
+  let monthIndex = months.indexOf(activeMonth.split("-")[1]);
+  let streak = 0;
+
+  for (let i = monthIndex; i >= 0; i--) {
+    let key = `${YEAR}-${months[i]}`;
+    let monthData = JSON.parse(localStorage.getItem(key)) || [];
+
+    if (monthData.length === 0) break;
+
+    let monthBudget = localStorage.getItem(`budget-${key}`) || 10000;
+    let monthTotal = monthData.reduce((s,e)=>s+e.amount,0);
+    if (monthTotal <= monthBudget) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+/* RENDER */
+function render() {
+  let total = getTotal();
+  let remaining = budget - total;
+
+  document.getElementById("total").innerText = "₹" + total;
+  document.getElementById("remaining").innerText = "₹" + remaining;
+
+  document.getElementById("budgetStatus").innerText =
+    total > budget ? "⚠ Over Budget" : "✔ Within Budget";
+
+  document.getElementById("budgetInput").value = budget;
+
+  document.getElementById("streak").innerText = getStreak() + " month(s)";
+
+  /* TABLE RENDER */
+  let list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.slice().reverse().forEach(e=>{
+    let row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${e.date}</td>
+      <td>${e.category}</td>
+      <td>₹${e.amount}</td>
+      <td><button class="delete-btn" onclick="deleteExpense(${e.id})">×</button></td>
+    `;
+
+    list.appendChild(row);
+  });
+
+  drawChart();
+  renderKakebo();
+  loadReflection();
+}
+
+render();
+
+</script>
+
+</body>
+</html>
